@@ -1,98 +1,95 @@
 version: 2.1
 
 orbs:
+  coveralls: coveralls/coveralls@2.0.0
   python: circleci/python@1.5.0
 
 # Define a job to be invoked later in a workflow.
 # See: https://circleci.com/docs/2.0/configuration-reference/#jobs
 jobs:
-  build-and-test-3-8:
+  build-and-test-3-12:
     docker:
-      - image: cimg/python:3.8
+      - image: cimg/python:3.12
     steps:
       - checkout
-      #- python/install-packages:
-      #     pkg-manager: pip
-          # app-dir: ~/project/package-directory/  # If your requirements.txt isn't in the root directory.
-          # pip-dependency-file: test-requirements.txt  # if you have a different name for your requirements file, maybe one that combines your runtime and test requirements.
+      - python/install-packages:
+           pkg-manager: pip
       - run:
           name: Install packages
           # This assumes pytest is installed via the install-package step above
           command: |
-            pip install matplotlib
-            pip install sphinx
             python setup.py install
             pip install coveralls
       - run:
           name: Run tests
           command: |
             python -m unittest discover
-            python -m unittest tests/tuner/test*.py
             coverage run --source . -m unittest discover
-  build-and-test-3-9:
+      - coveralls/upload
+  build-and-test-3-13:
     docker:
-      - image: cimg/python:3.9
+      - image: cimg/python:3.13
     steps:
       - checkout
+      - python/install-packages:
+           pkg-manager: pip
       - run:
           name: Install packages
           # This assumes pytest is installed via the install-package step above
           command: |
-            pip install matplotlib
-            pip install sphinx
             python setup.py install
             pip install coveralls
       - run:
           name: Run tests
           command: |
             python -m unittest discover
-            python -m unittest tests/tuner/test*.py
             coverage run --source . -m unittest discover
-  build-and-test-3-10:
+      - coveralls/upload
+  build-and-test-3-14:
     docker:
-      - image: cimg/python:3.10
+      - image: cimg/python:3.14
     steps:
       - checkout
+      - python/install-packages:
+           pkg-manager: pip
       - run:
           name: Install packages
           # This assumes pytest is installed via the install-package step above
           command: |
-            pip install matplotlib
-            pip install sphinx
             python setup.py install
             pip install coveralls
       - run:
           name: Run tests
           command: |
             python -m unittest discover
-            python -m unittest tests/tuner/test*.py
             coverage run --source . -m unittest discover
+      - coveralls/upload
   build-and-test-3-11:
     docker:
       - image: cimg/python:3.11
     steps:
       - checkout
+      - python/install-packages:
+           pkg-manager: pip
       - run:
           name: Install packages
           # This assumes pytest is installed via the install-package step above
           command: |
-            pip install matplotlib
-            pip install sphinx
             python setup.py install
             pip install coveralls
       - run:
           name: Run tests
           command: |
             python -m unittest discover
-            python -m unittest tests/tuner/test*.py
             coverage run --source . -m unittest discover
+      - coveralls/upload
 
-# Invoke jobs via workflows
+# Invoke jobs via workflows.
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
 workflows:
   sample:
     jobs:
-      - build-and-test-3-8
-      - build-and-test-3-9
-      - build-and-test-3-10
       - build-and-test-3-11
+      - build-and-test-3-12
+      - build-and-test-3-13
+      - build-and-test-3-14

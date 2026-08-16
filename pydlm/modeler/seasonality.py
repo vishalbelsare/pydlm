@@ -13,6 +13,7 @@ series, the seasonality components are nonparametric, i.e., there is no sin
 or cos relationship between each state. They can be arbitrarily valued.
 
 """
+
 import numpy as np
 from .component import component
 import pydlm.base.tools as tl
@@ -60,17 +61,11 @@ class seasonality(component):
 
     """
 
-
-    def __init__(self,
-                 period = 7,
-                 discount = 0.99,
-                 name = 'seasonality',
-                 w=100):
-
+    def __init__(self, period=7, discount=0.99, name="seasonality", w=100):
         if period <= 1:
-            raise NameError('Period has to be greater than 1.')
+            raise ValueError("Period has to be greater than 1.")
         self.d = period
-        self.componentType = 'seasonality'
+        self.componentType = "seasonality"
         self.name = name
         self.discount = np.ones(self.d) * discount
 
@@ -89,14 +84,10 @@ class seasonality(component):
         # create form free seasonality component
         self.freeForm()
 
-
     def createEvaluation(self):
-        """ Create the evaluation matrix
-
-        """
-        self.evaluation = np.matrix(np.zeros((1, self.d)))
+        """Create the evaluation matrix"""
+        self.evaluation = np.zeros((1, self.d))
         self.evaluation[0, 0] = 1
-
 
     # The transition matrix takes special form as
     # G = [0 1 0]
@@ -105,7 +96,7 @@ class seasonality(component):
     # So everyt time, when G * G, we rotate the vector once, which results
     # in the seasonality performance
     def createTransition(self):
-        """ Create the transition matrix.
+        """Create the transition matrix.
 
         According to Hurrison and West (1999), the transition matrix of seasonality
         takes a form of\n
@@ -116,47 +107,38 @@ class seasonality(component):
         [1 0 0 0]]
 
         """
-        self.transition = np.matrix(np.diag(np.ones(self.d - 1), 1))
+        self.transition = np.diag(np.ones(self.d - 1), 1)
         self.transition[self.d - 1, 0] = 1
 
+    def createCovPrior(self, cov=1e7):
+        """Create the prior covariance matrix for the latent states."""
+        self.covPrior = np.eye(self.d) * cov
 
-    def createCovPrior(self, cov = 1e7):
-        """Create the prior covariance matrix for the latent states.
-
-        """
-        self.covPrior = np.matrix(np.eye(self.d)) * cov
-
-
-    def createMeanPrior(self, mean = 0):
-        """ Create the prior latent state
-
-        """
-        self.meanPrior = np.matrix(np.ones((self.d, 1))) * mean
-
+    def createMeanPrior(self, mean=0):
+        """Create the prior latent state"""
+        self.meanPrior = np.ones((self.d, 1)) * mean
 
     # Form free seasonality component ensures that sum(mean) = 0
     # We use the formular from "Bayesian forecasting and dynamic linear models"
     # Page 242
     def freeForm(self):
-        """ The technique used in Hurrison and West (1999). After calling this method,
+        """The technique used in Hurrison and West (1999). After calling this method,
         The latent states sum up to 0 and the covariance matrix is degenerate to have
         rank d - 1, so that the sum of the latent states will never change when the
         system evolves
 
         """
         if self.covPrior is None or self.meanPrior is None:
-            raise NameError('freeForm can only be called after prior created.')
+            raise NameError("freeForm can only be called after prior created.")
         else:
-            u = np.sum(np.sum(self.covPrior, 0), 1)[0, 0]
-            A = np.sum(self.covPrior, 1) / u
-            self.meanPrior = self.meanPrior - A * np.sum(self.meanPrior, 0)[0, 0]
+            u = np.sum(self.covPrior)
+            A = np.sum(self.covPrior, axis=1, keepdims=True) / u
+            self.meanPrior = self.meanPrior - A * np.sum(self.meanPrior)
             self.covPrior = self.covPrior - np.dot(A, A.T) * u
 
-
     def checkDimensions(self):
-        """ if user supplies their own covPrior and meanPrior, this can
+        """if user supplies their own covPrior and meanPrior, this can
         be used to check if the dimension matches
 
         """
         tl.checker.checkVectorDimension(self.meanPrior, self.covPrior)
-        print('The dimension looks good!')

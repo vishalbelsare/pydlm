@@ -1,15 +1,31 @@
-[PyDLM](https://pydlm.github.io/)  [![wwrechard](https://circleci.com/gh/wwrechard/pydlm.svg?style=svg)](https://app.circleci.com/pipelines/github/wwrechard/pydlm)
- [![Coverage Status](https://coveralls.io/repos/github/wwrechard/pydlm/badge.svg?branch=master)](https://coveralls.io/github/wwrechard/pydlm?branch=master)
+[PyDLM](https://pydlm.github.io/)  [![wwrechard](https://circleci.com/gh/wwrechard/pydlm.svg?style=svg&cache-control=no-cache)](https://app.circleci.com/pipelines/github/wwrechard/pydlm)
+ [![Coverage Status](https://coveralls.io/repos/github/wwrechard/pydlm/badge.svg?branch=master&cache-control=no-cache)](https://coveralls.io/github/wwrechard/pydlm?branch=master)
 =======================================================
 
 
 Welcome to [pydlm](https://pydlm.github.io/), a flexible time series modeling library for python. This library is based on the Bayesian dynamic linear model (Harrison and West, 1999) and optimized for fast model fitting and inference.
 
-Updates in the github version
+Updates
 -------------------------------------------
-* A temporary fix on the `predict()` complexity bug (due to incorrect self-referencing, thanks romainjln@ and buhbuhtig@!). The fixed `predict()` complxity is O(n). The goal is to make it O(1).
-* A lite version [pydlm-lite](https://github.com/wwrechard/pydlm-lite) has been created where dependencies on `matplotlib` was removed. Going forward, most code refactoring on improving multi-threading and online learning will be done on the `pydlm-lite` package. The development on `pydlm` package will primarily focus on supporting broader model classes and more advanced sampling algorithms.
-* Version 0.1.1.11 released on PyPI.
+* Updates in the current Github version:
+    * Deprecated the usage of `np.matrix` to suppress the deprecation warning.
+    * Fixed coveralls so all PR merges will report coverage change.
+    * Updated the documentations in [pydlm.github.io](https://pydlm.github.io/) using `sphinx`. Exposed more complete APIs in the class reference.
+    * Simplified the implementation of `longSeason` component and turns `longSeason` and `autoReg` to be stateless.
+    * Add tests for `dlmAccessModule` and fix issues that some tests were not running by coveralls
+    * Supported pandas input to `dlm` and `dynamic` class. Used conditional import so `pandas` does not become a dependency to this library.
+
+* Version 0.1.1.13 has been released on PyPI.
+    * Migrated all the unnecessary `print()` to the default python logging operations, such as `logging.info`, `logging.warning` and `logging.critical`.
+    * Users can now set the model logging level to suppress unnecessary information during model run.
+    * Example to only print warning information: 
+
+    ```python
+        ...
+	    my_model.setLoggingLevel('WARNING')
+	    my_model.fit()
+    ```
+    * Updated the package version manage through `pip-compile` and `requirements.txt`.
 
 Installation
 ------------
@@ -21,7 +37,9 @@ You can also get the latest from [github](https://github.com/wwrechard/PyDLM)
 
       $ git clone git@github.com:wwrechard/pydlm.git pydlm
       $ cd pydlm
-      $ sudo python setup.py install
+      $ pip install pip-tools
+      $ pip install -r requirements.txt
+      $ pip install -e . --no-deps
 
 `pydlm` depends on the following modules,
 

@@ -1,7 +1,12 @@
 #!/bin/bash
 
-cd "$(dirname -- "$0")/.."
 VENV="$(basename $PWD).venv"
+
+if [ "$VENV" != "pydlm.venv" ]; then
+  echo "Error creating the virtual env..."
+  echo "Please run bootstrap script in the root directory."
+  return 1
+fi
 
 echo "==> Preparing dependencies..."
 
@@ -16,5 +21,4 @@ test -d $VENV || python -m venv $VENV || {
 source $VENV/bin/activate
 
 eval "$(pyenv init --path)"
-pip install numpy
-pip install matplotlib
+pip install -r requirements.txt

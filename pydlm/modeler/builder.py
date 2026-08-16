@@ -13,10 +13,13 @@ view componets of a given dlm. Builder will finally assemble all the components
 """
 # this class provide all the model building operations for constructing
 # customized model
-import numpy as np
+
 from pydlm.base.baseModel import baseModel
-from copy import deepcopy
 from pydlm.modeler.matrixTools import matrixTools as mt
+
+from copy import deepcopy
+import logging
+import numpy as np
 
 # The builder will be the main class for construting dlm
 # it featues two types of evaluation matrix and evaluation matrix
@@ -29,7 +32,7 @@ from pydlm.modeler.matrixTools import matrixTools as mt
 
 
 class builder:
-    """ The main modeling part of a dynamic linear model. It allows the users to
+    """The main modeling part of a dynamic linear model. It allows the users to
     custemize their own model. User can add, delete any components like trend
     or seasonality to the builder, or view the existing components. Builder
     will finally assemble all components to a big model for further training
@@ -70,8 +73,7 @@ class builder:
     """
 
     # create members
-    def __init__(self):
-
+    def __init__(self, logger=None):
         # the basic model structure for running kalman filter
         self.model = None
         self.initialized = False
@@ -113,12 +115,16 @@ class builder:
         self.renewTerm = -1.0
         self.renewDiscount = None  # used for adjusting renewTerm
 
-        # flag for determining whether the system info should be printed.
-        self._printInfo = True
+        # Allow customized logger to control the level of information printed
+        # during job execution. The default log level is 'INFO'.
+        if logger is None:
+            self._logger = logging.getLogger()
+        else:
+            self._logger = logger
 
     # The function that allows the user to add components
     def add(self, component):
-        """ Add a new model component to the builder.
+        """Add a new model component to the builder.
 
         Args:
             component: a model component, any class implements @component class
@@ -128,72 +134,70 @@ class builder:
         self.__add__(component)
 
     def __add__(self, component):
-        if component.componentType == 'dynamic':
+        if component.componentType == "dynamic":
             if component.name in self.dynamicComponents:
-                raise NameError('Please rename the component to a'
-                                + ' different name.')
+                raise NameError("Please rename the component to a" + " different name.")
             self.dynamicComponents[component.name] = component
 
-        if component.componentType == 'autoReg' \
-           or component.componentType == 'longSeason':
+        if (
+            component.componentType == "autoReg"
+            or component.componentType == "longSeason"
+        ):
             if component.name in self.automaticComponents:
-                raise NameError('Please rename the component to a'
-                                + ' different name.')
+                raise NameError("Please rename the component to a" + " different name.")
             self.automaticComponents[component.name] = component
 
-        if component.componentType == 'trend' \
-           or component.componentType == 'seasonality':
+        if (
+            component.componentType == "trend"
+            or component.componentType == "seasonality"
+        ):
             if component.name in self.staticComponents:
-                raise NameError('Please rename the component' +
-                                ' to a different name.')
+                raise NameError("Please rename the component" + " to a different name.")
             self.staticComponents[component.name] = component
 
             # we use seasonality's discount to adjust the renewTerm
-            if component.componentType == 'seasonality':
+            if component.componentType == "seasonality":
                 if self.renewDiscount is None:
                     self.renewDiscount = 1.0
-                self.renewDiscount = min(self.renewDiscount,
-                                         min(component.discount))
+                self.renewDiscount = min(self.renewDiscount, min(component.discount))
         self.initialized = False
         return self
 
     # print all components to the client
     def ls(self):
-        """ List out all the existing components to the model
-
-        """
+        """List out all the existing components to the model"""
 
         if len(self.staticComponents) > 0:
-            print('The static components are')
+            print("The static components are")
             for name in self.staticComponents:
                 comp = self.staticComponents[name]
-                print(comp.name + ' (degree = ' + str(comp.d) + ')')
-            print(' ')
+                print(comp.name + " (degree = " + str(comp.d) + ")")
+            print(" ")
         else:
-            print('There is no static component.')
-            print(' ')
+            print("There is no static component.")
+            print(" ")
 
         if len(self.dynamicComponents) > 0:
-            print('The dynamic components are')
+            print("The dynamic components are")
             for name in self.dynamicComponents:
                 comp = self.dynamicComponents[name]
-                print(comp.name + ' (dimension = ' + str(comp.d) + ')')
-            print(' ')
+                print(comp.name + " (dimension = " + str(comp.d) + ")")
+            print(" ")
         else:
-            print('There is no dynamic component.')
-            print(' ')
+            print("There is no dynamic component.")
+            print(" ")
 
         if len(self.automaticComponents) > 0:
-            print('The automatic components are')
+            print("The automatic components are")
             for name in self.automaticComponents:
                 comp = self.automaticComponents[name]
-                print(comp.name + ' (dimension = ' + str(comp.d) + ')')
+                print(comp.name + " (dimension = " + str(comp.d) + ")")
         else:
-            print('There is no automatic component.')
+            print("There is no automatic component.")
 
     # delete the componet that pointed out by the client
     def delete(self, name):
-        """ Delete a specific component from dlm by its name.
+        """Delete a specific component from dlm by its name.
 
         Args:
             name: the name of the component. Can be read from ls()
@@ -207,7 +211,7 @@ class builder:
         elif name in self.automaticComponents:
             del self.automaticComponents[name]
         else:
-            raise NameError('Such component does not exisit!')
+            raise NameError("Such component does not exisit!")
 
         self.initialized = False
 
@@ -215,22 +219,21 @@ class builder:
     # noise is the prior guess of the variance of the observed data
     # data is used by auto regressor.
     def initialize(self, data=[], noise=1):
-        """ Initialize the model. It construct the baseModel by assembling all
+        """Initialize the model. It construct the baseModel by assembling all
         quantities from the components.
 
         Args:
             noise: the initial guess of the variance of the observation noise.
         """
-        if len(self.staticComponents) == 0 and \
-           len(self.dynamicComponents) == 0 and \
-           len(self.automaticComponents) == 0:
-
-            raise NameError('The model must contain at least' +
-                            ' one component')
+        if (
+            len(self.staticComponents) == 0
+            and len(self.dynamicComponents) == 0
+            and len(self.automaticComponents) == 0
+        ):
+            raise NameError("The model must contain at least" + " one component")
 
         # construct transition, evaluation, prior state, prior covariance
-        if self._printInfo:
-            print('Initializing models...')
+        self._logger.info("Initializing models...")
         transition = None
         evaluation = None
         state = None
@@ -244,8 +247,7 @@ class builder:
         for i in self.staticComponents:
             comp = self.staticComponents[i]
             transition = mt.matrixAddInDiag(transition, comp.transition)
-            evaluation = mt.matrixAddByCol(evaluation,
-                                           comp.evaluation)
+            evaluation = mt.matrixAddByCol(evaluation, comp.evaluation)
             state = mt.matrixAddByRow(state, comp.meanPrior)
             sysVar = mt.matrixAddInDiag(sysVar, comp.covPrior)
             self.discount = np.concatenate((self.discount, comp.discount))
@@ -259,13 +261,11 @@ class builder:
                 comp = self.dynamicComponents[i]
                 comp.updateEvaluation(0)
                 transition = mt.matrixAddInDiag(transition, comp.transition)
-                evaluation = mt.matrixAddByCol(evaluation,
-                                               comp.evaluation)
+                evaluation = mt.matrixAddByCol(evaluation, comp.evaluation)
                 state = mt.matrixAddByRow(state, comp.meanPrior)
                 sysVar = mt.matrixAddInDiag(sysVar, comp.covPrior)
                 self.discount = np.concatenate((self.discount, comp.discount))
-                self.componentIndex[i] = (currentIndex,
-                                          currentIndex + comp.d - 1)
+                self.componentIndex[i] = (currentIndex, currentIndex + comp.d - 1)
                 currentIndex += comp.d
 
         # if the model contains the automatic dynamic part, we add
@@ -276,24 +276,24 @@ class builder:
                 comp = self.automaticComponents[i]
                 comp.updateEvaluation(0, data)
                 transition = mt.matrixAddInDiag(transition, comp.transition)
-                evaluation = mt.matrixAddByCol(evaluation,
-                                               comp.evaluation)
+                evaluation = mt.matrixAddByCol(evaluation, comp.evaluation)
                 state = mt.matrixAddByRow(state, comp.meanPrior)
                 sysVar = mt.matrixAddInDiag(sysVar, comp.covPrior)
                 self.discount = np.concatenate((self.discount, comp.discount))
-                self.componentIndex[i] = (currentIndex,
-                                          currentIndex + comp.d - 1)
+                self.componentIndex[i] = (currentIndex, currentIndex + comp.d - 1)
                 currentIndex += comp.d
 
         self.statePrior = state
         self.sysVarPrior = sysVar
-        self.noiseVar = np.matrix(noise)
-        self.model = baseModel(transition=transition,
-                               evaluation=evaluation,
-                               noiseVar=np.matrix(noise),
-                               sysVar=sysVar,
-                               state=state,
-                               df=self.initialDegreeFreedom)
+        self.noiseVar = np.array([[noise]])
+        self.model = baseModel(
+            transition=transition,
+            evaluation=evaluation,
+            noiseVar=np.array([[noise]]),
+            sysVar=sysVar,
+            state=state,
+            df=self.initialDegreeFreedom,
+        )
         self.model.initializeObservation()
 
         # compute the renew period
@@ -301,12 +301,12 @@ class builder:
             self.renewDiscount = np.min(self.discount)
 
         if self.renewDiscount < 1.0 - 1e-8:
-            self.renewTerm = np.log(0.001 * (1 - self.renewDiscount)) \
-                             / np.log(self.renewDiscount)
+            self.renewTerm = np.log(0.001 * (1 - self.renewDiscount)) / np.log(
+                self.renewDiscount
+            )
 
         self.initialized = True
-        if self._printInfo:
-            print('Initialization finished.')
+        self._logger.info("Initialization finished.")
 
     # Initialize from another builder exported from other dlm class
     def initializeFromBuilder(self, data, exported_builder):
@@ -333,19 +333,19 @@ class builder:
             self.renewDiscount = np.min(self.discount)
 
         if self.renewDiscount < 1.0 - 1e-8:
-            self.renewTerm = np.log(0.001 * (1 - self.renewDiscount)) \
-                             / np.log(self.renewDiscount)
-        
+            self.renewTerm = np.log(0.001 * (1 - self.renewDiscount)) / np.log(
+                self.renewDiscount
+            )
+
         self.initialized = True
-        if self._printInfo:
-            print('Initialization finished.')
-            
+        self._logger.info("Initialization finished.")
+
     # This function allows the model to update the dynamic evaluation vector,
     # so that the model can handle control variables
     # This function should be called only when dynamicComponents is not empty
     # data is used by auto regressor.
     def updateEvaluation(self, step, data):
-        """ Update the evaluation matrix of the model to a specific date.
+        """Update the evaluation matrix of the model to a specific date.
         It loops over all dynamic components and update their evaluation
         matrix and then reconstruct the model evaluation matrix by
         incorporating the new evaluations
@@ -365,11 +365,13 @@ class builder:
         for i in self.dynamicComponents:
             comp = self.dynamicComponents[i]
             comp.updateEvaluation(step)
-            self.model.evaluation[0, self.componentIndex[i][0]:
-                                  (self.componentIndex[i][1] + 1)] = comp.evaluation
+            self.model.evaluation[
+                0, self.componentIndex[i][0] : (self.componentIndex[i][1] + 1)
+            ] = comp.evaluation
 
         for i in self.automaticComponents:
             comp = self.automaticComponents[i]
             comp.updateEvaluation(step, data)
-            self.model.evaluation[0, self.componentIndex[i][0]:
-                                  (self.componentIndex[i][1] + 1)] = comp.evaluation
+            self.model.evaluation[
+                0, self.componentIndex[i][0] : (self.componentIndex[i][1] + 1)
+            ] = comp.evaluation
